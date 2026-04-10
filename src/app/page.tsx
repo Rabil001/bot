@@ -1,0 +1,585 @@
+"use client";
+
+import { useState, useRef, useEffect } from "react";
+import ReactMarkdown from 'react-markdown';
+import { 
+  SquarePen, 
+  ChevronDown, 
+  Mic, 
+  ArrowUp,
+  Hexagon,
+  ArrowDown,
+  Moon,
+  Sun,
+  StopCircle
+} from "lucide-react";
+
+type Message = {
+  id: string;
+  role: "user" | "ai";
+  content: string;
+  imageUrl?: string;
+  isTypingEffect?: boolean;
+};
+
+// Component for typewriter effect
+const AiMessage = ({ msg, isDarkMode }: { msg: Message; isDarkMode: boolean }) => {
+  const [displayedText, setDisplayedText] = useState(msg.isTypingEffect ? "" : msg.content);
+  const [showImage, setShowImage] = useState(!msg.isTypingEffect);
+
+  useEffect(() => {
+    if (!msg.isTypingEffect) {
+      setDisplayedText(msg.content);
+      setShowImage(true);
+      return;
+    }
+    
+    let i = 0;
+    let timeoutId: NodeJS.Timeout;
+
+    const typeNextChar = () => {
+      if (i >= msg.content.length) {
+        setDisplayedText(msg.content);
+        setShowImage(true);
+        window.dispatchEvent(new CustomEvent('chat-updated'));
+        return;
+      }
+
+      setDisplayedText(msg.content.slice(0, i + 1));
+      i++;
+      
+      if (i % 10 === 0) {
+        window.dispatchEvent(new CustomEvent('chat-updated'));
+      }
+
+      // Variable typing speed logic
+      let delay = 10; // fast baseline
+      const char = msg.content[i];
+      
+      if (char === '.' || char === '!' || char === '?') {
+        delay = 300; // Pause at sentences
+      } else if (char === ',') {
+        delay = 100; // Pause at commas
+      } else if (char === '\n') {
+        delay = 200; // Pause at line breaks
+      } else if (Math.random() > 0.95) {
+        delay = 60; // Random hesitation
+      }
+
+      timeoutId = setTimeout(typeNextChar, delay);
+    };
+
+    timeoutId = setTimeout(typeNextChar, 50);
+
+    return () => clearTimeout(timeoutId);
+  }, [msg]);
+
+  return (
+    <div className="space-y-6 w-full">
+      {/* Animated Text rendered as Markdown */}
+      <div className={`prose prose-base max-w-none prose-p:leading-[1.8] prose-p:mb-12 prose-headings:font-bold prose-headings:mb-8 prose-headings:mt-16 prose-ul:mb-12 prose-li:mb-6 prose-li:leading-relaxed prose-blockquote:border-l-4 prose-blockquote:pl-4 prose-blockquote:italic prose-blockquote:mb-8 ${isDarkMode ? 'prose-invert prose-blockquote:border-slate-600 prose-strong:text-slate-100 prose-em:text-slate-300' : 'prose-slate prose-strong:text-gray-900 prose-em:text-gray-600 prose-blockquote:border-gray-300'}`}>
+        <ReactMarkdown>{displayedText}</ReactMarkdown>
+      </div>
+      
+      {/* Visual Concept (Appears below text after typing) */}
+      {msg.imageUrl && showImage && (
+        <div className="relative rounded-xl overflow-hidden shadow-sm border border-gray-200 animate-[fadeInUp_0.6s_ease-out_forwards]">
+          <img src={msg.imageUrl} alt="AI Concept" className="w-full h-auto object-cover max-h-[350px] bg-gray-50" />
+          <div className="absolute top-2 right-2 bg-black/40 backdrop-blur-md text-white text-[10px] px-2 py-1 rounded-md uppercase font-semibold tracking-wider">
+            Visual Concept
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+
+export default function Home() {
+  // Start with an empty chat to show the new empty state
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [input, setInput] = useState("");
+  const [isTyping, setIsTyping] = useState(false);
+  const [thinkingState, setThinkingState] = useState("");
+  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [showScrollButton, setShowScrollButton] = useState(false);
+  const [isStopping, setIsStopping] = useState(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to bottom of chat
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    setShowScrollButton(false);
+  };
+
+  useEffect(() => {
+    // Only auto scroll initially or when sending a message
+    if (!showScrollButton) {
+      scrollToBottom();
+    }
+    
+    // Listen for custom event from typing animation
+    const handleChatUpdate = () => {
+      // Only auto-scroll while typing if they are already at the bottom
+      if (!showScrollButton) {
+        scrollToBottom();
+      }
+    };
+    window.addEventListener('chat-updated', handleChatUpdate);
+    return () => window.removeEventListener('chat-updated', handleChatUpdate);
+  }, [messages, isTyping, showScrollButton]);
+
+  const handleScroll = () => {
+    if (!chatContainerRef.current) return;
+    
+    const { scrollTop, scrollHeight, clientHeight } = chatContainerRef.current;
+    // If we scroll up more than 100px from the bottom, show the button
+    const isScrolledUp = scrollHeight - scrollTop - clientHeight > 100;
+    setShowScrollButton(isScrolledUp);
+  };
+
+  const startNewChat = () => {
+    setMessages([]);
+    setInput("");
+  };
+
+  const stopOutput = () => {
+    if (!isTyping) return;
+    setIsStopping(true);
+    setIsTyping(false);
+    abortControllerRef.current?.abort();
+    abortControllerRef.current = null;
+    setThinkingState("");
+    setMessages(prev => prev.map(msg => msg.isTypingEffect ? { ...msg, isTypingEffect: false } : msg));
+  };
+
+  const handleSend = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    if (!input.trim()) return;
+
+    const userMsg: Message = { id: Date.now().toString(), role: "user", content: input };
+    setMessages(prev => [...prev, userMsg]);
+    setInput("");
+    
+    // Reset textarea height instantly using querySelector
+    const textarea = document.getElementById("main-chat-input") as HTMLTextAreaElement;
+    if (textarea) {
+      textarea.style.height = "auto";
+      textarea.style.height = "44px"; // Default min-height
+    }
+
+    setIsTyping(true);
+    setThinkingState("Reading your idea...");
+    setIsStopping(false);
+    abortControllerRef.current = new AbortController();
+
+    // Simulate human thinking phases
+    setTimeout(() => setThinkingState("Thinking about the market..."), 1200);
+    setTimeout(() => setThinkingState("Figuring out next steps..."), 2500);
+
+    try {
+      const response = await fetch("/api/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: "Chat Idea", idea: userMsg.content, category: "general", tone: "friendly" }),
+        signal: abortControllerRef.current.signal,
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.details || "Failed to analyze idea");
+      }
+
+      // Format text response beautifully using Markdown, but more conversational
+      const aiResponseText = `## Quick take
+
+${data.intro}
+
+
+
+## The real problem
+
+**${data.problem.strength} pain point:** ${data.problem.statement}
+
+
+
+## Who this is for
+
+Focus on: ${data.targetUsers.segments.map((s: string) => `*${s}*`).join(", ")}.
+
+${data.targetUsers.description}
+
+
+
+## Things to watch out for
+
+${data.risks.map((risk: string) => `- ${risk}`).join('\n\n\n\n')}
+
+
+
+## What to try next
+
+${data.improvements.map((tip: string) => `- ${tip}`).join('\n\n\n\n')}
+`;
+
+      // Generate a free visual concept image using pollinations.ai
+      const imagePrompt = encodeURIComponent(`High quality 3D isometric render, minimal, clean white background, startup product concept: ${data.summary}`);
+      const imageUrl = `https://image.pollinations.ai/prompt/${imagePrompt}?width=800&height=400&nologo=true`;
+
+      setMessages(prev => [...prev, { 
+        id: (Date.now() + 1).toString(), 
+        role: "ai", 
+        content: aiResponseText,
+        imageUrl: imageUrl,
+        isTypingEffect: true // Flag to trigger animation
+      }]);
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        return;
+      }
+      console.error(error);
+      setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: "ai", content: "Sorry, I ran into an error processing that. Please try again." }]);
+    } finally {
+      abortControllerRef.current = null;
+      setIsTyping(false);
+      setIsStopping(false);
+    }
+  };
+
+  const InputForm = () => {
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+    // Auto-resize logic extracted into a function
+    const adjustHeight = () => {
+      const textarea = textareaRef.current;
+      if (textarea) {
+        textarea.style.height = "auto"; // Reset height first
+        textarea.style.height = `${Math.min(textarea.scrollHeight, 250)}px`; // Set to scrollHeight up to 250px max
+      }
+    };
+
+    // Run adjust height whenever input changes or component mounts
+    useEffect(() => {
+      adjustHeight();
+    }, [input]);
+
+    return (
+      <div className="w-full relative flex flex-col items-center">
+        <form 
+          onSubmit={handleSend} 
+          className="w-full relative flex items-end bg-[#f4f4f4] rounded-3xl p-2 focus-within:ring-1 focus-within:ring-gray-300 transition-all border border-transparent focus-within:border-gray-200"
+        >
+          <textarea
+            ref={textareaRef}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSend();
+              }
+            }}
+            placeholder="Tell me your idea..."
+            className="w-full max-h-[250px] py-3 px-2 bg-transparent text-gray-900 placeholder-gray-500 outline-none resize-none leading-relaxed overflow-y-auto"
+            rows={1}
+            style={{ minHeight: "44px" }}
+          />
+
+          
+          <div className="flex items-center gap-2 mb-1 shrink-0 px-1">
+            <button type="button" className="p-2 text-gray-500 hover:text-gray-700 rounded-full transition-colors hidden sm:block">
+              <Mic className="w-5 h-5" />
+            </button>
+            <button
+              type="submit"
+              disabled={!input.trim() || isTyping}
+              className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
+                !input.trim() || isTyping 
+                  ? 'bg-gray-300 text-gray-500' 
+                  : 'bg-black text-white hover:opacity-80'
+              }`}
+            >
+              <ArrowUp className="w-5 h-5" strokeWidth={3} />
+            </button>
+          </div>
+        </form>
+        <p className="text-xs text-gray-500 mt-2 mb-1">
+          I'm here to help, but double-check important details.
+        </p>
+      </div>
+    );
+  };
+
+  return (
+    <>
+      <style>{`
+        @keyframes fadeInUp {
+          from { opacity: 0; transform: translateY(10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
+      <div className={`flex h-screen overflow-hidden font-sans ${isDarkMode ? 'bg-slate-950 text-slate-100' : 'bg-white text-gray-900'}`}>
+      
+      {/* LEFT SIDEBAR: History & Profile */}
+      <aside className="w-[260px] bg-[#f9f9f9] flex flex-col hidden md:flex shrink-0 border-r border-gray-200">
+        
+        {/* Top Sidebar Actions: Profile and New Chat */}
+        <div className="h-14 flex items-center justify-between px-4 pt-2">
+          {/* Profile at the top */}
+          <button className="flex items-center gap-2 p-1 hover:bg-gray-200 rounded-lg transition-colors">
+            <div className="w-7 h-7 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-xs shrink-0">
+              R
+            </div>
+            <span className="font-medium text-sm text-gray-800">Rabil</span>
+          </button>
+
+          {/* New Chat Button */}
+          <button onClick={startNewChat} className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-200 rounded-lg transition-colors" title="New chat">
+            <SquarePen className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* History List */}
+        <div className="flex-1 overflow-y-auto px-3 mt-4 space-y-1">
+          <p className="px-3 text-xs font-semibold text-gray-500 mb-2">Today</p>
+          <button className="w-full flex items-center px-3 py-2 text-sm text-gray-900 bg-gray-200 rounded-lg text-left">
+            <span className="truncate">AI Gardening Assistant</span>
+          </button>
+          
+          <p className="px-3 text-xs font-semibold text-gray-500 mt-6 mb-2">Previous 7 Days</p>
+          <button className="w-full flex items-center px-3 py-2 text-sm text-gray-600 hover:bg-gray-200 rounded-lg transition-colors text-left">
+            <span className="truncate">Uber for Dog Walkers</span>
+          </button>
+          <button className="w-full flex items-center px-3 py-2 text-sm text-gray-600 hover:bg-gray-200 rounded-lg transition-colors text-left">
+            <span className="truncate">Smart Recipe App</span>
+          </button>
+        </div>
+      </aside>
+
+      {/* MAIN CONTENT AREA */}
+      <main className={`flex-1 flex flex-col min-w-0 relative ${isDarkMode ? 'bg-slate-950' : 'bg-white'}`}>
+        
+        {/* TOP HORIZONTAL PANEL */}
+        <header className={`h-14 flex items-center px-4 sticky top-0 shrink-0 z-10 ${isDarkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-b border-gray-200'}`}>
+          <button className={`flex items-center gap-2 px-2 py-1 rounded-lg transition-colors ${isDarkMode ? 'hover:bg-slate-800 bg-slate-900 text-slate-100' : 'hover:bg-gray-100 bg-white text-gray-900'}`}>
+            <span className="text-lg font-medium">Shapper</span>
+            <ChevronDown className={`w-4 h-4 ${isDarkMode ? 'text-slate-300' : 'text-gray-500'}`} />
+          </button>
+
+          <div className="ml-auto flex items-center gap-2">
+            <button
+              onClick={() => setIsDarkMode(prev => !prev)}
+              className={`flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium transition-colors ${isDarkMode ? 'bg-slate-800 text-slate-100 hover:bg-slate-700' : 'bg-gray-100 text-gray-800 hover:bg-gray-200'}`}
+              title={isDarkMode ? 'Switch to light mode' : 'Switch to night mode'}
+            >
+              {isDarkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+              Mode
+            </button>
+          </div>
+        </header>
+
+        <div className="flex-1 flex flex-col overflow-hidden relative">
+          {messages.length === 0 ? (
+            // EMPTY STATE
+            <div className="flex-1 flex flex-col items-center justify-center px-4 w-full max-w-3xl mx-auto mb-20">
+
+              <h2 className="text-3xl font-medium text-gray-800 mb-8">What's your idea?</h2>
+              <div className="w-full relative flex flex-col items-center">
+                <form 
+                  onSubmit={handleSend} 
+                  className="w-full relative flex items-end bg-[#f4f4f4] rounded-3xl p-2 focus-within:ring-1 focus-within:ring-gray-300 transition-all border border-transparent focus-within:border-gray-200"
+                >
+                  <textarea
+                    id="main-chat-input"
+                    value={input}
+                    onChange={(e) => {
+                      setInput(e.target.value);
+                      e.target.style.height = "auto";
+                      e.target.style.height = `${Math.min(e.target.scrollHeight, 250)}px`;
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        handleSend();
+                      }
+                    }}
+                    placeholder="Tell me your idea..."
+                    className="w-full py-3 px-2 bg-transparent text-gray-900 placeholder-gray-500 outline-none resize-none overflow-y-auto leading-relaxed"
+                    rows={1}
+                    style={{ height: "44px", minHeight: "44px", maxHeight: "250px" }}
+                  />
+                  
+                  <div className="flex items-center gap-2 mb-1 shrink-0 px-1">
+                    {isTyping && (
+                      <button
+                        type="button"
+                        onClick={stopOutput}
+                        className="p-2 rounded-full bg-red-100 text-red-600 hover:bg-red-200 transition-colors"
+                        title="Stop output"
+                      >
+                        <StopCircle className="w-5 h-5" />
+                      </button>
+                    )}
+                    <button type="button" className="p-2 text-gray-500 hover:text-gray-700 rounded-full transition-colors hidden sm:block">
+                      <Mic className="w-5 h-5" />
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={!input.trim() || isTyping}
+                      className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
+                        !input.trim() || isTyping 
+                          ? 'bg-gray-300 text-gray-500' 
+                          : 'bg-black text-white hover:opacity-80'
+                      }`}
+                    >
+                      <ArrowUp className="w-5 h-5" strokeWidth={3} />
+                    </button>
+                  </div>
+                </form>
+                <p className="text-xs text-gray-500 mt-2 mb-1">
+                  I'm here to help, but double-check important details.
+                </p>
+              </div>
+            </div>
+          ) : (
+            // CHAT STATE
+            <>
+
+              {/* CHAT MESSAGES AREA */}
+              <div 
+                ref={chatContainerRef}
+                onScroll={handleScroll}
+                className="flex-1 overflow-y-auto px-4 scroll-smooth"
+              >
+                <div className="max-w-3xl mx-auto flex flex-col gap-6 py-6 pb-4">
+                  {messages.map((msg) => (
+                    <div key={msg.id} className={`flex w-full ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                      {msg.role === 'ai' && (
+                        <div className="w-8 h-8 rounded-full border border-gray-200 bg-white flex items-center justify-center shrink-0 mt-1 mr-4 shadow-sm">
+                          <Hexagon className="w-4 h-4 text-gray-800" fill="currentColor" />
+                        </div>
+                      )}
+                      
+                      <div className={`max-w-[80%] w-full ${
+                        msg.role === 'user' 
+                          ? 'bg-[#f4f4f4] rounded-[24px] px-5 py-2.5 text-gray-900' 
+                          : `${isDarkMode ? 'bg-slate-900 text-slate-100' : 'text-gray-800'} pt-1`
+                      }`}>
+                        {msg.role === 'user' ? (
+                          <div className="whitespace-pre-wrap">{msg.content}</div>
+                        ) : (
+                          <AiMessage msg={msg} isDarkMode={isDarkMode} />
+                        )}
+                      </div>
+                    </div>
+                  ))}
+
+                  {/* TYPING INDICATOR */}
+                  {isTyping && (
+                    <div className="flex w-full justify-start">
+                      <div className="w-8 h-8 rounded-full border border-gray-200 bg-white flex items-center justify-center shrink-0 mt-1 mr-4 shadow-sm">
+                        <Hexagon className="w-4 h-4 text-gray-800" fill="currentColor" />
+                      </div>
+                      <div className="flex flex-col">
+                        <div className="text-xs font-medium text-gray-400 mb-1 animate-pulse">{thinkingState}</div>
+                        <div className="flex items-center gap-1.5 pt-1">
+                          <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+                          <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+                          <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  <div ref={messagesEndRef} />
+                </div>
+                
+                {/* SCROLL TO BOTTOM BUTTON */}
+                {showScrollButton && (
+                  <div className="sticky bottom-6 flex justify-center w-full pb-4 z-20">
+                    <button 
+                      onClick={() => {
+                        scrollToBottom();
+                        setShowScrollButton(false);
+                      }}
+                      className="bg-white border border-gray-200 shadow-md rounded-full p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-50 transition-all animate-fade-in"
+                    >
+                      <ArrowDown className="w-5 h-5" />
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* INPUT AREA AT BOTTOM */}
+              <div className="p-4 bg-gradient-to-t from-white via-white to-transparent shrink-0">
+                <div className="max-w-3xl mx-auto w-full">
+                  <div className="w-full relative flex flex-col items-center">
+                    <form 
+                      onSubmit={handleSend} 
+                      className="w-full relative flex items-end bg-[#f4f4f4] rounded-3xl p-2 focus-within:ring-1 focus-within:ring-gray-300 transition-all border border-transparent focus-within:border-gray-200"
+                    >
+                      <textarea
+                        id="main-chat-input"
+                        value={input}
+                        onChange={(e) => {
+                          setInput(e.target.value);
+                          // Auto-resize logic attached directly to the onChange event
+                          e.target.style.height = "auto";
+                          e.target.style.height = `${Math.min(e.target.scrollHeight, 250)}px`;
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();
+                            handleSend();
+                          }
+                        }}
+                        placeholder="Tell me your idea..."
+                        className="w-full py-3 px-2 bg-transparent text-gray-900 placeholder-gray-500 outline-none resize-none overflow-y-auto leading-relaxed"
+                        rows={1}
+                        style={{ height: "44px", minHeight: "44px", maxHeight: "250px" }}
+                      />
+                      
+                      <div className="flex items-center gap-2 mb-1 shrink-0 px-1">
+                        {isTyping && (
+                          <button
+                            type="button"
+                            onClick={stopOutput}
+                            className="p-2 rounded-full bg-red-100 text-red-600 hover:bg-red-200 transition-colors"
+                            title="Stop output"
+                          >
+                            <StopCircle className="w-5 h-5" />
+                          </button>
+                        )}
+                        <button type="button" className="p-2 text-gray-500 hover:text-gray-700 rounded-full transition-colors hidden sm:block">
+                          <Mic className="w-5 h-5" />
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={!input.trim() || isTyping}
+                          className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
+                            !input.trim() || isTyping 
+                              ? 'bg-gray-300 text-gray-500' 
+                              : 'bg-black text-white hover:opacity-80'
+                          }`}
+                        >
+                          <ArrowUp className="w-5 h-5" strokeWidth={3} />
+                        </button>
+                      </div>
+                    </form>
+                    <p className="text-xs text-gray-500 mt-2 mb-1">
+                      I'm here to help, but double-check important details.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      </main>
+    </div>
+    </>
+  );
+}
+
