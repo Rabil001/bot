@@ -12,35 +12,25 @@ export async function POST(req: Request) {
 
     const genAI = new GoogleGenerativeAI(apiKey);
 
-    // Define the JSON schema for Gemini to follow
+    // Define a much simpler, natural JSON schema
     const schema: Schema = {
-      description: "Creative strategist analysis schema",
+      description: "Natural conversational response schema",
       type: SchemaType.OBJECT,
       properties: {
-        summary: { type: SchemaType.STRING, description: "A very short internal summary for context" },
-        hook: { type: SchemaType.STRING, description: "Two sentences: the vibe and the core problem solved" },
-        strategicAnalysis: {
-          type: SchemaType.OBJECT,
-          properties: {
-            feasibility: { type: SchemaType.STRING, description: "Evaluation of technical/logical ease" },
-            marketFit: { type: SchemaType.STRING, description: "Evaluation of target audience alignment" },
-            innovationScore: { type: SchemaType.STRING, description: "Evaluation of uniqueness" }
-          },
-          required: ["feasibility", "marketFit", "innovationScore"]
+        message: { 
+          type: SchemaType.STRING, 
+          description: "A long, natural, conversational response. Use Markdown for structure but don't overdo it. Talk like a real human mentor." 
         },
         visualConcept: {
           type: SchemaType.OBJECT,
           properties: {
-            palette: { type: SchemaType.STRING, description: "Specific color palette" },
-            lighting: { type: SchemaType.STRING, description: "Lighting style" },
-            heroPrompt: { type: SchemaType.STRING, description: "A 'hero' visual description for image generation" }
+            summary: { type: SchemaType.STRING, description: "A very short summary of the product (3-5 words)" },
+            heroPrompt: { type: SchemaType.STRING, description: "A high-quality 3D render description for the visual" }
           },
-          required: ["palette", "lighting", "heroPrompt"]
-        },
-        devilsAdvocate: { type: SchemaType.STRING, description: "Brief challenge to one major assumption" },
-        roadmap: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING }, description: "3-5 concrete steps to MVP" }
+          required: ["summary", "heroPrompt"]
+        }
       },
-      required: ["summary", "hook", "strategicAnalysis", "visualConcept", "devilsAdvocate", "roadmap"]
+      required: ["message", "visualConcept"]
     };
 
     const model = genAI.getGenerativeModel({
@@ -51,21 +41,28 @@ export async function POST(req: Request) {
       },
     });
 
-    const systemPrompt = `From now on, I want you to act as my Lead Creative Strategist. Your goal is to take my raw ideas and turn them into structured concepts. 
+    const systemPrompt = `You are a startup mentor and a creative friend. Someone is sharing their raw idea with you. 
 
-    LANGUAGE RULE (VERY IMPORTANT):
-    Always respond in the same language as the user input.
-    Do NOT mix languages.
-    
-    TONE RULES:
-    Keep the tone professional, insightful, and slightly witty. 
+    YOUR GOAL: 
+    Talk to them naturally. Don't use a fixed template or robotic sections. Just react to their idea, tell them what you find cool about it, and share some real-world advice on what to think about next.
 
-    FORMATTING RULES:
-    If the idea involves math, physics, or complex logic, use LaTeX for the formulas (wrap in $ or $$).
+    LANGUAGE RULE:
+    Always respond in the same language as the user. No mixing.
+
+    TONE:
+    - Natural, warm, and human.
+    - No corporate jargon or "Strategic Analysis" headers.
+    - If you challenge them, do it like a friend ("I'm wondering if X might be a hurdle...").
+    - Use "I" and "you".
+
+    FORMATTING:
+    - Use Markdown for bold text or occasional lists to keep it readable.
+    - Don't use tables unless it's truly necessary.
+    - No LaTeX unless the user specifically asks for math.
     
     User's Idea: "${idea}"
 
-    You must return your response as a valid JSON object matching the provided schema.`;
+    Return a JSON object with a 'message' field containing your conversational response and a 'visualConcept' field for the app UI.`;
 
     const result = await model.generateContent(systemPrompt);
     const responseText = result.response.text();

@@ -203,30 +203,10 @@ export default function Home() {
       }
 
       // Format text response beautifully using Markdown
-      const aiResponseText = `## 1. The Hook
-${data.hook}
-
-## 2. Strategic Analysis
-| Evaluation | Detail |
-| :--- | :--- |
-| **Feasibility** | ${data.strategicAnalysis.feasibility} |
-| **Market Fit** | ${data.strategicAnalysis.marketFit} |
-| **Innovation Score** | ${data.strategicAnalysis.innovationScore} |
-
-## 3. Visual Concept & Art Direction
-- **Color Palette:** ${data.visualConcept.palette}
-- **Lighting Style:** ${data.visualConcept.lighting}
-- **Hero Visual:** ${data.visualConcept.heroPrompt}
-
-## 4. The 'Devil’s Advocate' Section
-${data.devilsAdvocate}
-
-## 5. Execution Roadmap
-${data.roadmap.map((step: string, index: number) => `${index + 1}. ${step}`).join('\n')}
-`;
+      const aiResponseText = data.message;
 
       // Generate a free visual concept image using pollinations.ai
-      const imagePrompt = encodeURIComponent(`High quality 3D isometric render, minimal, clean white background, startup product concept: ${data.visualConcept.heroPrompt || data.summary}`);
+      const imagePrompt = encodeURIComponent(`High quality 3D isometric render, minimal, clean white background, startup product concept: ${data.visualConcept.heroPrompt || data.visualConcept.summary}`);
       const imageUrl = `https://image.pollinations.ai/prompt/${imagePrompt}?width=800&height=400&nologo=true`;
 
       setMessages(prev => [...prev, { 
