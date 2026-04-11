@@ -19,15 +19,15 @@ export async function POST(req: Request) {
       properties: {
         message: { 
           type: SchemaType.STRING, 
-          description: "A long, natural, conversational response. Use Markdown for structure but don't overdo it. Talk like a real human mentor." 
+          description: "A long, natural, conversational response. Use Markdown for structure and generous spacing. Talk like a real human mentor." 
         },
         visualConcept: {
           type: SchemaType.OBJECT,
           properties: {
             summary: { type: SchemaType.STRING, description: "A very short summary of the product (3-5 words)" },
-            heroPrompt: { type: SchemaType.STRING, description: "A high-quality 3D render description for the visual" }
+            wireframe: { type: SchemaType.STRING, description: "A text-based wireframe or structural layout of the main screen. Use simple ASCII or a clear list of UI components." }
           },
-          required: ["summary", "heroPrompt"]
+          required: ["summary", "wireframe"]
         }
       },
       required: ["message", "visualConcept"]
@@ -63,7 +63,10 @@ export async function POST(req: Request) {
     
     User's Idea: "${idea}"
 
-    Return a JSON object with a 'message' field containing your well-formatted, spacious conversational response and a 'visualConcept' field for the app UI.`;
+    VISUAL CONCEPT RULE:
+    Instead of an image, provide a 'wireframe' field. This should be a clear, text-based description or ASCII-like structure of how the main interface should look. Focus on the user flow and placement of elements.
+
+    Return a JSON object with a 'message' field and a 'visualConcept' field.`;
 
     const result = await model.generateContent(systemPrompt);
     const responseText = result.response.text();

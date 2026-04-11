@@ -22,19 +22,19 @@ type Message = {
   id: string;
   role: "user" | "ai";
   content: string;
-  imageUrl?: string;
+  wireframe?: string;
   isTypingEffect?: boolean;
 };
 
 // Component for typewriter effect
 const AiMessage = ({ msg, isDarkMode }: { msg: Message; isDarkMode: boolean }) => {
   const [displayedText, setDisplayedText] = useState(msg.isTypingEffect ? "" : msg.content);
-  const [showImage, setShowImage] = useState(!msg.isTypingEffect);
+  const [showWireframe, setShowWireframe] = useState(!msg.isTypingEffect);
 
   useEffect(() => {
     if (!msg.isTypingEffect) {
       setDisplayedText(msg.content);
-      setShowImage(true);
+      setShowWireframe(true);
       return;
     }
     
@@ -44,7 +44,7 @@ const AiMessage = ({ msg, isDarkMode }: { msg: Message; isDarkMode: boolean }) =
     const typeNextChar = () => {
       if (i >= msg.content.length) {
         setDisplayedText(msg.content);
-        setShowImage(true);
+        setShowWireframe(true);
         window.dispatchEvent(new CustomEvent('chat-updated'));
         return;
       }
@@ -90,13 +90,15 @@ const AiMessage = ({ msg, isDarkMode }: { msg: Message; isDarkMode: boolean }) =
         </ReactMarkdown>
       </div>
       
-      {/* Visual Concept (Appears below text after typing) */}
-      {msg.imageUrl && showImage && (
-        <div className="relative rounded-xl overflow-hidden shadow-sm border border-gray-200 animate-[fadeInUp_0.6s_ease-out_forwards]">
-          <img src={msg.imageUrl} alt="AI Concept" className="w-full h-auto object-cover max-h-[350px] bg-gray-50" />
-          <div className="absolute top-2 right-2 bg-black/40 backdrop-blur-md text-white text-[10px] px-2 py-1 rounded-md uppercase font-semibold tracking-wider">
-            Visual Concept
+      {/* Wireframe Concept (Appears below text after typing) */}
+      {msg.wireframe && showWireframe && (
+        <div className={`relative rounded-xl overflow-hidden shadow-sm border p-6 font-mono text-sm animate-[fadeInUp_0.6s_ease-out_forwards] ${isDarkMode ? 'bg-slate-900 border-slate-700 text-slate-300' : 'bg-gray-50 border-gray-200 text-gray-700'}`}>
+          <div className={`absolute top-2 right-2 text-[10px] px-2 py-1 rounded-md uppercase font-semibold tracking-wider ${isDarkMode ? 'bg-slate-800 text-slate-400' : 'bg-gray-200 text-gray-500'}`}>
+            Wireframe Concept
           </div>
+          <pre className="whitespace-pre-wrap leading-relaxed">
+            {msg.wireframe}
+          </pre>
         </div>
       )}
     </div>
@@ -205,15 +207,11 @@ export default function Home() {
       // Format text response beautifully using Markdown
       const aiResponseText = data.message;
 
-      // Generate a free visual concept image using pollinations.ai
-      const imagePrompt = encodeURIComponent(`High quality 3D isometric render, minimal, clean white background, startup product concept: ${data.visualConcept.heroPrompt || data.visualConcept.summary}`);
-      const imageUrl = `https://image.pollinations.ai/prompt/${imagePrompt}?width=800&height=400&nologo=true`;
-
       setMessages(prev => [...prev, { 
         id: (Date.now() + 1).toString(), 
         role: "ai", 
         content: aiResponseText,
-        imageUrl: imageUrl,
+        wireframe: data.visualConcept.wireframe,
         isTypingEffect: true // Flag to trigger animation
       }]);
     } catch (error: any) {
