@@ -34,7 +34,7 @@ export async function POST(req: Request) {
     };
 
     const model = genAI.getGenerativeModel({
-      model: "gemini-3-flash-preview", 
+      model: "gemini-1.5-flash-latest", 
       generationConfig: {
         responseMimeType: "application/json",
         responseSchema: schema,
@@ -69,7 +69,14 @@ export async function POST(req: Request) {
     Return a JSON object with a 'message' field and a 'visualConcept' field.`;
 
     const result = await model.generateContent(systemPrompt);
-    const responseText = result.response.text();
+    let responseText = result.response.text();
+    
+    // Clean potential markdown formatting if the model ignores the MIME type
+    if (responseText.includes("```json")) {
+      responseText = responseText.split("```json")[1].split("```")[0].trim();
+    } else if (responseText.includes("```")) {
+      responseText = responseText.split("```")[1].split("```")[0].trim();
+    }
     
     return NextResponse.json(JSON.parse(responseText));
 
