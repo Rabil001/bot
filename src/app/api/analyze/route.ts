@@ -66,13 +66,6 @@ export async function POST(req: Request) {
     User's Idea: "${idea}"
 
     You must return your response as a valid JSON object matching the provided schema.`;
-        "Keep each risk as a short bullet point. E.g., 'Also, make sure you're testing the willingness to pay early on.'"
-      ],
-      "improvements": [
-        "Keep each suggestion as a short bullet point. E.g., 'What if you stripped away all the AI stuff and just made this a simple text-message service?'",
-        "Keep each suggestion as a short bullet point. E.g., 'Tomorrow, don't write any code. Just go to a local coffee shop and ask 5 people if they have this problem.'"
-      ]
-    }`;
 
     const result = await model.generateContent(systemPrompt);
     const responseText = result.response.text();
