@@ -51,18 +51,19 @@ export async function POST(req: Request) {
 
     TONE:
     - Natural, warm, and human.
-    - No corporate jargon or "Strategic Analysis" headers.
     - If you challenge them, do it like a friend ("I'm wondering if X might be a hurdle...").
     - Use "I" and "you".
 
-    FORMATTING:
-    - Use Markdown for bold text or occasional lists to keep it readable.
-    - Don't use tables unless it's truly necessary.
-    - No LaTeX unless the user specifically asks for math.
+    FORMATTING (VITAL FOR READABILITY):
+    - Use Markdown Headers (###) for main topics.
+    - Use bold text sparingly to highlight key concepts.
+    - IMPORTANT: Add at least TWO newlines between paragraphs and sections for generous spacing.
+    - Keep paragraphs short (2-3 sentences max).
+    - Use bullet points for advice to make it scannable.
     
     User's Idea: "${idea}"
 
-    Return a JSON object with a 'message' field containing your conversational response and a 'visualConcept' field for the app UI.`;
+    Return a JSON object with a 'message' field containing your well-formatted, spacious conversational response and a 'visualConcept' field for the app UI.`;
 
     const result = await model.generateContent(systemPrompt);
     const responseText = result.response.text();
