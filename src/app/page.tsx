@@ -2,6 +2,10 @@
 
 import { useState, useRef, useEffect } from "react";
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
+import 'katex/dist/katex.min.css';
 import { 
   SquarePen, 
   ChevronDown, 
@@ -77,8 +81,13 @@ const AiMessage = ({ msg, isDarkMode }: { msg: Message; isDarkMode: boolean }) =
   return (
     <div className="space-y-6 w-full">
       {/* Animated Text rendered as Markdown */}
-      <div className={`prose prose-base max-w-none prose-p:leading-[1.8] prose-p:mb-12 prose-headings:font-bold prose-headings:mb-8 prose-headings:mt-16 prose-ul:mb-12 prose-li:mb-6 prose-li:leading-relaxed prose-blockquote:border-l-4 prose-blockquote:pl-4 prose-blockquote:italic prose-blockquote:mb-8 ${isDarkMode ? 'prose-invert prose-blockquote:border-slate-600 prose-strong:text-slate-100 prose-em:text-slate-300' : 'prose-slate prose-strong:text-gray-900 prose-em:text-gray-600 prose-blockquote:border-gray-300'}`}>
-        <ReactMarkdown>{displayedText}</ReactMarkdown>
+      <div className={`prose prose-base max-w-none prose-p:leading-[1.8] prose-p:mb-12 prose-headings:font-bold prose-headings:mb-8 prose-headings:mt-16 prose-ul:mb-12 prose-li:mb-6 prose-li:leading-relaxed prose-blockquote:border-l-4 prose-blockquote:pl-4 prose-blockquote:italic prose-blockquote:mb-8 prose-table:border prose-table:border-collapse prose-th:border prose-th:p-2 prose-td:border prose-td:p-2 ${isDarkMode ? 'prose-invert prose-blockquote:border-slate-600 prose-strong:text-slate-100 prose-em:text-slate-300' : 'prose-slate prose-strong:text-gray-900 prose-em:text-gray-600 prose-blockquote:border-gray-300'}`}>
+        <ReactMarkdown 
+          remarkPlugins={[remarkGfm, remarkMath]} 
+          rehypePlugins={[rehypeKatex]}
+        >
+          {displayedText}
+        </ReactMarkdown>
       </div>
       
       {/* Visual Concept (Appears below text after typing) */}
@@ -193,40 +202,31 @@ export default function Home() {
         throw new Error(data.details || "Failed to analyze idea");
       }
 
-      // Format text response beautifully using Markdown, but more conversational
-      const aiResponseText = `## Quick take
+      // Format text response beautifully using Markdown
+      const aiResponseText = `## 1. The Hook
+${data.hook}
 
-${data.intro}
+## 2. Strategic Analysis
+| Evaluation | Detail |
+| :--- | :--- |
+| **Feasibility** | ${data.strategicAnalysis.feasibility} |
+| **Market Fit** | ${data.strategicAnalysis.marketFit} |
+| **Innovation Score** | ${data.strategicAnalysis.innovationScore} |
 
+## 3. Visual Concept & Art Direction
+- **Color Palette:** ${data.visualConcept.palette}
+- **Lighting Style:** ${data.visualConcept.lighting}
+- **Hero Visual:** ${data.visualConcept.heroPrompt}
 
+## 4. The 'Devil’s Advocate' Section
+${data.devilsAdvocate}
 
-## The real problem
-
-**${data.problem.strength} pain point:** ${data.problem.statement}
-
-
-
-## Who this is for
-
-Focus on: ${data.targetUsers.segments.map((s: string) => `*${s}*`).join(", ")}.
-
-${data.targetUsers.description}
-
-
-
-## Things to watch out for
-
-${data.risks.map((risk: string) => `- ${risk}`).join('\n\n\n\n')}
-
-
-
-## What to try next
-
-${data.improvements.map((tip: string) => `- ${tip}`).join('\n\n\n\n')}
+## 5. Execution Roadmap
+${data.roadmap.map((step: string, index: number) => `${index + 1}. ${step}`).join('\n')}
 `;
 
       // Generate a free visual concept image using pollinations.ai
-      const imagePrompt = encodeURIComponent(`High quality 3D isometric render, minimal, clean white background, startup product concept: ${data.summary}`);
+      const imagePrompt = encodeURIComponent(`High quality 3D isometric render, minimal, clean white background, startup product concept: ${data.visualConcept.heroPrompt || data.summary}`);
       const imageUrl = `https://image.pollinations.ai/prompt/${imagePrompt}?width=800&height=400&nologo=true`;
 
       setMessages(prev => [...prev, { 
